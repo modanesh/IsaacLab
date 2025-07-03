@@ -130,12 +130,12 @@ def main():
 
     # export policy to onnx/jit
     export_model_dir = os.path.join(os.path.dirname(resume_path), "exported")
-    export_policy_as_jit(policy_nn, ppo_runner.obs_normalizer, path=export_model_dir, filename="policy.pt")
-    export_policy_as_onnx(
-        policy_nn, normalizer=ppo_runner.obs_normalizer, path=export_model_dir, filename="policy.onnx"
-    )
+    export_policy_as_jit(policy_nn, ppo_runner.obs_normalizer, path=export_model_dir, filename=f"policy_{resume_path.split('/')[-2]}.pt")
+    export_policy_as_onnx(policy_nn, normalizer=ppo_runner.obs_normalizer, path=export_model_dir, filename=f"policy_{resume_path.split('/')[-2]}.onnx")
 
     dt = env.unwrapped.step_dt
+
+    obs_list, act_list, rew_list, done_list = [], [], [], []
 
     # reset environment
     obs, _ = env.get_observations()
@@ -148,7 +148,15 @@ def main():
             # agent stepping
             actions = policy(obs)
             # env stepping
-            obs, _, _, _ = env.step(actions)
+            next_obs, rwds, dns, infos = env.step(actions)
+
+        obs_list.append(obs)
+        act_list.append(actions)
+        rew_list.append(rwds)
+        done_list.append(dns)
+
+        obs = next_obs
+
         if args_cli.video:
             timestep += 1
             # Exit the play loop after recording one video
@@ -162,6 +170,22 @@ def main():
 
     # close the simulator
     env.close()
+
+    all_observations = torch.stack(obs_list, dim=0)  # [T, num_envs, obs_dim]
+    all_actions = torch.stack(act_list, dim=0)
+    all_rewards = torch.stack(rew_list, dim=0)
+    all_dones = torch.stack(done_list, dim=0)
+    # save all as a torch tensor in a single pt file
+    torch.save(
+        {
+            "observations": all_observations,
+            "actions": all_actions,
+            "rewards": all_rewards,
+            "dones": all_dones,
+        },
+        os.path.join(export_model_dir, f"trajectories_{resume_path.split('/')[-2]}.pt"),
+    )
+
 
 
 if __name__ == "__main__":
