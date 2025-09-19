@@ -72,5 +72,6 @@ tests/
 
 # Virtual Environments
 **/venv/
+wandb
 
 tmp.*
