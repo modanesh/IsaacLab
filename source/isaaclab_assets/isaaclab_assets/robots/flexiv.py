@@ -31,9 +31,9 @@ from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 # Configuration
 ##
 
-FLEXIV_RIZON4_CFG = ArticulationCfg(
+FLEXIV_WITH_GRIPPER_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path=f"{ISAAC_NUCLEUS_DIR}/Robots/Flexiv/Rizon4/flexiv_rizon4.usd",
+        usd_path="/home/mohamad/Research/IsaacLab/source/isaaclab_assets/isaaclab_assets/robots/data/flexiv/flexiv_rizon4_with_Robotiq_2F_85_flattened.usd",
         activate_contact_sensors=False,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=False,
@@ -45,27 +45,28 @@ FLEXIV_RIZON4_CFG = ArticulationCfg(
     ),
     init_state=ArticulationCfg.InitialStateCfg(
         joint_pos={
-            "joint1": 0.0,  # Base rotation
-            "joint2": -0.6,  # Shoulder
-            "joint3": 0.0,  # Elbow rotation
-            "joint4": -1.5,  # Elbow bend
-            "joint5": 0.0,  # Wrist rotation
-            "joint6": 1.0,  # Wrist bend
-            "joint7": 0.0,  # Flange rotation
+            "joint1": 0.0,
+            "joint2": -0.6,
+            "joint3": 0.0,
+            "joint4": -1.5,
+            "joint5": 0.0,
+            "joint6": 1.0,
+            "joint7": 0.0,
+            "finger_joint": 0.04,
         },
     ),
     actuators={
-        "flexiv_shoulder": ImplicitActuatorCfg(
-            joint_names_expr=["joint[1-4]"],
+        "flexiv_arm": ImplicitActuatorCfg(
+            joint_names_expr=["joint[1-7]"],
             effort_limit_sim=87.0,
             stiffness=80.0,
             damping=4.0,
         ),
-        "flexiv_forearm": ImplicitActuatorCfg(
-            joint_names_expr=["joint[5-7]"],
-            effort_limit_sim=12.0,
-            stiffness=80.0,
-            damping=4.0,
+        "gripper": ImplicitActuatorCfg(
+            joint_names_expr=["finger_joint"],
+            effort_limit_sim=200.0,
+            stiffness=2e3,
+            damping=1e2,
         ),
     },
     soft_joint_pos_limit_factor=1.0,
