@@ -22,10 +22,10 @@ Joint Limits (in radians):
     - joint7: [-2.967, 2.967]  (±170°)
 """
 
-from isaaclab.sim import sim_utils
+import isaaclab.sim as sim_utils
 from isaaclab.actuators import ImplicitActuatorCfg
 from isaaclab.assets.articulation import ArticulationCfg
-from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
+from isaaclab.utils.assets import ISAACLAB_NUCLEUS_DIR
 
 # Main configuration for Flexiv + Robotiq gripper
 FLEXIV_WITH_GRIPPER_CFG = ArticulationCfg(
