@@ -7,8 +7,8 @@
 
 The following configurations are available:
 
-* :obj:`FLEXIV_RIZON4S_CFG`: Flexiv Rizon 4s robot with Grav gripper
-* :obj:`FLEXIV_RIZON4S_HIGH_PD_CFG`: Flexiv Rizon 4s robot with stiffer PD control
+* : obj:`FLEXIV_RIZON4_CFG`: Flexiv Rizon 4 robot
+* :obj:`FLEXIV_RIZON4_HIGH_PD_CFG`: Flexiv Rizon 4 robot with stiffer PD control
 
 Reference:  https://github.com/flexivrobotics/isaac_sim_ws
 """
@@ -16,19 +16,15 @@ Reference:  https://github.com/flexivrobotics/isaac_sim_ws
 import isaaclab.sim as sim_utils
 from isaaclab.actuators import ImplicitActuatorCfg
 from isaaclab.assets.articulation import ArticulationCfg
-import pathlib
+from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 
 ##
 # Configuration
 ##
 
-
-CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
-FLEXIV_USD_PATH = str(CURRENT_DIR / "data" / "flexiv" / "Rizon4s_with_Grav.usd")
-
-FLEXIV_RIZON4S_CFG = ArticulationCfg(
+FLEXIV_RIZON4_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path=FLEXIV_USD_PATH,
+        usd_path=f"{ISAAC_NUCLEUS_DIR}/Robots/Flexiv/Rizon4/flexiv_rizon4.usd",
         activate_contact_sensors=False,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=False,
@@ -47,7 +43,6 @@ FLEXIV_RIZON4S_CFG = ArticulationCfg(
             "joint5": 0.0,
             "joint6": 3.037,
             "joint7": 0.741,
-            "finger_joint": 0.04,
         },
     ),
     actuators={
@@ -63,25 +58,19 @@ FLEXIV_RIZON4S_CFG = ArticulationCfg(
             stiffness=80.0,
             damping=4.0,
         ),
-        "flexiv_gripper": ImplicitActuatorCfg(
-            joint_names_expr=["finger_joint"],
-            effort_limit_sim=200.0,
-            stiffness=2e3,
-            damping=1e2,
-        ),
     },
     soft_joint_pos_limit_factor=1.0,
 )
-"""Configuration of Flexiv Rizon 4s robot with Grav gripper."""
+"""Configuration of Flexiv Rizon 4 robot."""
 
 
-FLEXIV_RIZON4S_HIGH_PD_CFG = FLEXIV_RIZON4S_CFG.copy()
-FLEXIV_RIZON4S_HIGH_PD_CFG.spawn.rigid_props.disable_gravity = True
-FLEXIV_RIZON4S_HIGH_PD_CFG.actuators["flexiv_shoulder"].stiffness = 400.0
-FLEXIV_RIZON4S_HIGH_PD_CFG.actuators["flexiv_shoulder"].damping = 80.0
-FLEXIV_RIZON4S_HIGH_PD_CFG.actuators["flexiv_forearm"].stiffness = 400.0
-FLEXIV_RIZON4S_HIGH_PD_CFG.actuators["flexiv_forearm"].damping = 80.0
-"""Configuration of Flexiv Rizon 4s robot with stiffer PD control.
+FLEXIV_RIZON4_HIGH_PD_CFG = FLEXIV_RIZON4_CFG.copy()
+FLEXIV_RIZON4_HIGH_PD_CFG.spawn.rigid_props.disable_gravity = True
+FLEXIV_RIZON4_HIGH_PD_CFG.actuators["flexiv_shoulder"].stiffness = 400.0
+FLEXIV_RIZON4_HIGH_PD_CFG.actuators["flexiv_shoulder"].damping = 80.0
+FLEXIV_RIZON4_HIGH_PD_CFG.actuators["flexiv_forearm"].stiffness = 400.0
+FLEXIV_RIZON4_HIGH_PD_CFG.actuators["flexiv_forearm"].damping = 80.0
+"""Configuration of Flexiv Rizon 4 robot with stiffer PD control.
 
 This configuration is useful for task-space control using differential IK.
 """
