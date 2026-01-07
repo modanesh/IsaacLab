@@ -11,6 +11,15 @@ The following configurations are available:
 * :obj:`FLEXIV_RIZON4_HIGH_PD_CFG`: Flexiv Rizon 4 robot with stiffer PD control
 
 Reference:  https://github.com/flexivrobotics/isaac_sim_ws
+
+Joint Limits (in radians):
+    - joint1: [-2.792, 2.792]  (±160°)
+    - joint2: [-2.269, 2.269]  (±130°)
+    - joint3: [-2.967, 2.967]  (±170°)
+    - joint4: [-1.867, 2.688]  (-107° to 154°)
+    - joint5: [-2.967, 2.967]  (±170°)
+    - joint6: [-1.396, 4.538]  (-80° to 260°)
+    - joint7: [-2.967, 2.967]  (±170°)
 """
 
 import isaaclab.sim as sim_utils
@@ -36,17 +45,17 @@ FLEXIV_RIZON4_CFG = ArticulationCfg(
     ),
     init_state=ArticulationCfg.InitialStateCfg(
         joint_pos={
-            "joint1": 0.0,
-            "joint2": -0.569,
-            "joint3": 0.0,
-            "joint4": -2.810,
-            "joint5": 0.0,
-            "joint6": 3.037,
-            "joint7": 0.741,
+            "joint1": 0.0,  # Base rotation
+            "joint2": -0.6,  # Shoulder
+            "joint3": 0.0,  # Elbow rotation
+            "joint4": -1.5,  # Elbow bend
+            "joint5": 0.0,  # Wrist rotation
+            "joint6": 1.0,  # Wrist bend
+            "joint7": 0.0,  # Flange rotation
         },
     ),
     actuators={
-        "flexiv_shoulder":  ImplicitActuatorCfg(
+        "flexiv_shoulder": ImplicitActuatorCfg(
             joint_names_expr=["joint[1-4]"],
             effort_limit_sim=87.0,
             stiffness=80.0,
@@ -62,7 +71,6 @@ FLEXIV_RIZON4_CFG = ArticulationCfg(
     soft_joint_pos_limit_factor=1.0,
 )
 """Configuration of Flexiv Rizon 4 robot."""
-
 
 FLEXIV_RIZON4_HIGH_PD_CFG = FLEXIV_RIZON4_CFG.copy()
 FLEXIV_RIZON4_HIGH_PD_CFG.spawn.rigid_props.disable_gravity = True
