@@ -7,7 +7,7 @@
 
 The following configurations are available:
 
-* : obj:`FLEXIV_RIZON4_CFG`: Flexiv Rizon 4 robot
+* : obj:`FLEXIV_WITH_GRIPPER_CFG`: Flexiv Rizon 4 robot
 * :obj:`FLEXIV_RIZON4_HIGH_PD_CFG`: Flexiv Rizon 4 robot with stiffer PD control
 
 Reference:  https://github.com/flexivrobotics/isaac_sim_ws
@@ -22,15 +22,12 @@ Joint Limits (in radians):
     - joint7: [-2.967, 2.967]  (±170°)
 """
 
-import isaaclab.sim as sim_utils
+from isaaclab.sim import sim_utils
 from isaaclab.actuators import ImplicitActuatorCfg
 from isaaclab.assets.articulation import ArticulationCfg
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 
-##
-# Configuration
-##
-
+# Main configuration for Flexiv + Robotiq gripper
 FLEXIV_WITH_GRIPPER_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
         usd_path="/home/mohamad/Research/IsaacLab/source/isaaclab_assets/isaaclab_assets/robots/data/flexiv/flexiv_rizon4_with_Robotiq_2F_85_flattened.usd",
@@ -69,17 +66,12 @@ FLEXIV_WITH_GRIPPER_CFG = ArticulationCfg(
             damping=1e2,
         ),
     },
-    soft_joint_pos_limit_factor=1.0,
 )
-"""Configuration of Flexiv Rizon 4 robot."""
 
-FLEXIV_RIZON4_HIGH_PD_CFG = FLEXIV_RIZON4_CFG.copy()
-FLEXIV_RIZON4_HIGH_PD_CFG.spawn.rigid_props.disable_gravity = True
-FLEXIV_RIZON4_HIGH_PD_CFG.actuators["flexiv_shoulder"].stiffness = 400.0
-FLEXIV_RIZON4_HIGH_PD_CFG.actuators["flexiv_shoulder"].damping = 80.0
-FLEXIV_RIZON4_HIGH_PD_CFG.actuators["flexiv_forearm"].stiffness = 400.0
-FLEXIV_RIZON4_HIGH_PD_CFG.actuators["flexiv_forearm"].damping = 80.0
-"""Configuration of Flexiv Rizon 4 robot with stiffer PD control.
-
-This configuration is useful for task-space control using differential IK.
-"""
+# Add a high-pd version of the configuration for stiffer control
+FLEXIV_HIGH_PD_CFG = FLEXIV_WITH_GRIPPER_CFG.copy()
+FLEXIV_HIGH_PD_CFG.spawn.rigid_props.disable_gravity = True
+FLEXIV_HIGH_PD_CFG.actuators["flexiv_arm"].stiffness = 400.0
+FLEXIV_HIGH_PD_CFG.actuators["flexiv_arm"].damping = 80.0
+FLEXIV_HIGH_PD_CFG.actuators["gripper"].stiffness = 4000.0  # High stiffness for the gripper
+FLEXIV_HIGH_PD_CFG.actuators["gripper"].damping = 200.0
