@@ -12,6 +12,7 @@ from .ant import *
 from .anymal import *
 from .cart_double_pendulum import *
 from .cartpole import *
+from .flexiv import *
 from .fourier import *
 from .franka import *
 from .humanoid import *
