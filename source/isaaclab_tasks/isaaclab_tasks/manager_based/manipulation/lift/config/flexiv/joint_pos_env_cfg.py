@@ -21,10 +21,8 @@ class FlexivCubeLiftEnvCfg(LiftEnvCfg):
     def __post_init__(self):
         super().__post_init__()
 
-        # 1. Robot
         self.scene.robot = FLEXIV_WITH_GRIPPER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
-        # 2. Arm Action
         self.actions.arm_action = mdp.JointPositionActionCfg(
             asset_name="robot",
             joint_names=["joint[1-7]"],
@@ -32,15 +30,12 @@ class FlexivCubeLiftEnvCfg(LiftEnvCfg):
             use_default_offset=True
         )
 
-        # 3. Gripper Action
-        # The inspection confirmed 'finger_joint' is REVOLUTE with limit ~0.78 rads.
-        # DO NOT use 0.8 meters here.
         self.actions.gripper_action = mdp.BinaryJointPositionActionCfg(
             asset_name="robot",
             joint_names=["finger_joint"],
-            # Open = 0.05 rads
-            open_command_expr={"finger_joint": 0.05},
-            # Close = 0.7 rads (Safely inside the 0.78 limit)
+            # 0.0 is Fully Open (Parallel)
+            open_command_expr={"finger_joint": 0.0},
+            # 0.7 is Fully Closed (Tips Touching)
             close_command_expr={"finger_joint": 0.7},
         )
 

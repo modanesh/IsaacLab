@@ -1,102 +1,260 @@
-# inspect_robot_deep.py
-import os
-from isaaclab.app import AppLauncher
+"""
+Inspect Gripper Joint Relationships in Isaac Lab
+This checks if the 5 extra gripper joints are mimic joints or need separate control
+"""
 
-# Launch Isaac Sim
+from isaaclab.app import AppLauncher
 app_launcher = AppLauncher(headless=True)
 simulation_app = app_launcher.app
 
-import omni.usd
-from pxr import Usd, UsdPhysics, UsdGeom, PhysxSchema, Gf
+import torch
+import carb
+from isaaclab.sim import SimulationContext, SimulationCfg
+from isaaclab.scene import InteractiveScene, InteractiveSceneCfg
+from isaaclab.assets import AssetBaseCfg
+from isaaclab.sim.spawners.from_files import GroundPlaneCfg
+from isaaclab.utils import configclass
+from pxr import Usd, UsdPhysics, PhysxSchema
+
+# Import your Flexiv config
+from isaaclab_assets.robots.flexiv import FLEXIV_WITH_GRIPPER_CFG
 
 
-def main():
-    # PATH
-    usd_path = "/home/mohamad/Research/IsaacLab/source/isaaclab_assets/isaaclab_assets/robots/data/flexiv/Rizon4s_with_Grav.usd"
+@configclass
+class TestSceneCfg(InteractiveSceneCfg):
+    robot = FLEXIV_WITH_GRIPPER_CFG.replace(prim_path="/World/Robot")
+    plane = AssetBaseCfg(prim_path="/World/GroundPlane", spawn=GroundPlaneCfg())
 
-    if not os.path.exists(usd_path):
-        print(f"[ERROR] Path not found: {usd_path}")
-        simulation_app.close()
-        return
 
-    print(f"[INFO] Opening Stage: {usd_path}")
-    omni.usd.get_context().open_stage(usd_path)
-    stage = omni.usd.get_context().get_stage()
+def print_sep(title=""):
+    print("\n" + "="*80)
+    if title:
+        print(f"  {title}")
+        print("="*80)
 
-    print("\n" + "=" * 120)
-    print(" 1. MASS PROPERTIES (Critical for Stability)")
-    print("    If Mass < 0.01 or Inertia is near 0, simulation will explode.")
-    print("=" * 120)
-    print(f"{'LINK PATH':<60} | {'MASS':<10} | {'INERTIA DIAGONAL':<30}")
-    print("-" * 120)
 
-    for prim in stage.Traverse():
-        if prim.HasAPI(UsdPhysics.MassAPI):
-            mass_api = UsdPhysics.MassAPI(prim)
-            mass = mass_api.GetMassAttr().Get()
-            inertia = mass_api.GetDiagonalInertiaAttr().Get()
+def inspect_gripper_joints():
+    print_sep("GRIPPER JOINT RELATIONSHIP INSPECTOR")
 
-            # Format output
-            m_str = f"{mass:.4f}" if mass is not None else "None"
-            i_str = str(inertia) if inertia is not None else "None"
+    # Initialize simulation
+    sim_cfg = SimulationCfg(dt=0.01)
+    sim = SimulationContext(sim_cfg)
+    scene_cfg = TestSceneCfg(num_envs=1, env_spacing=2.0)
+    scene = InteractiveScene(scene_cfg)
+    sim.reset()
 
-            print(f"{prim.GetPath().pathString:<60} | {m_str:<10} | {i_str:<30}")
+    robot = scene["robot"]
 
-    print("\n" + "=" * 120)
-    print(" 2. JOINT DRIVES & MIMICS (Critical for Control)")
-    print("    Check if joints have existing Stiffness/Damping or are Mimic joints.")
-    print("=" * 120)
-    print(f"{'JOINT NAME':<40} | {'TYPE':<10} | {'STIFFNESS':<10} | {'DAMPING':<10} | {'MIMIC?'}")
-    print("-" * 120)
+    # Get USD stage
+    stage = simulation_app.context.get_stage()
 
-    for prim in stage.Traverse():
-        if prim.IsA(UsdPhysics.Joint):
-            path = prim.GetName()
-            j_type = "Unknown"
-            if prim.IsA(UsdPhysics.RevoluteJoint):
-                j_type = "Revolute"
-            elif prim.IsA(UsdPhysics.PrismaticJoint):
-                j_type = "Prismatic"
-            elif prim.IsA(UsdPhysics.FixedJoint):
-                j_type = "Fixed"
+    print("\n[1] Analyzing Gripper Joints in USD")
+    print("-" * 80)
 
-            # Check Drive API
-            stiffness = "N/A"
-            damping = "N/A"
-            # Usually drives are "angular" or "linear"
-            if prim.HasAPI(UsdPhysics.DriveAPI):
-                # Try getting the API for "angular" drive which is standard for revolute
-                drive = UsdPhysics.DriveAPI.Get(prim, "angular")
-                if not drive:
-                    drive = UsdPhysics.DriveAPI.Get(prim, "linear")
+    # All gripper-related joints
+    gripper_joints = [
+        "finger_joint",
+        "left_inner_knuckle_joint",
+        "right_inner_knuckle_joint",
+        "right_outer_knuckle_joint",
+        "left_outer_finger_joint",
+        "right_outer_finger_joint"
+    ]
 
-                if drive:
-                    s_attr = drive.GetStiffnessAttr().Get()
-                    d_attr = drive.GetDampingAttr().Get()
-                    stiffness = f"{s_attr:.1f}" if s_attr is not None else "None"
-                    damping = f"{d_attr:.1f}" if d_attr is not None else "None"
+    # Get the robot prim path
+    robot_prim = stage.GetPrimAtPath("/World/Robot")
 
-            # Check Mimic API
-            mimic = "No"
-            if prim.HasAPI(PhysxSchema.PhysxMimicJointAPI):
-                mimic = "YES"
+    print(f"\nSearching for joints under: /World/Robot")
 
-            print(f"{path:<40} | {j_type:<10} | {stiffness:<10} | {damping:<10} | {mimic}")
-
-    print("\n" + "=" * 120)
-    print(" 3. COLLISION MESHES")
-    print("    Check if tip links have collision meshes that might hit the table.")
-    print("=" * 120)
+    joint_info = {}
 
     for prim in stage.Traverse():
-        if prim.HasAPI(UsdPhysics.CollisionAPI):
-            # Check if it's a mesh
-            is_mesh = prim.IsA(UsdGeom.Mesh)
-            parent = prim.GetParent().GetName()
-            print(f"Collision Prim: {prim.GetName():<30} (Parent: {parent})")
+        prim_path = str(prim.GetPath())
+        prim_name = prim.GetName()
+
+        if prim_name in gripper_joints and "Robot" in prim_path:
+            print(f"\n  Found: {prim_name}")
+            print(f"    Path: {prim_path}")
+
+            # Check if it's a physics joint
+            if prim.IsA(UsdPhysics.Joint):
+                print(f"    Type: Physics Joint")
+
+                # Check for mimic joint (PhysX specific)
+                is_mimic = False
+                try:
+                    if prim.HasAPI(PhysxSchema.PhysxMimicJointAPI):
+                        print(f"    *** MIMIC JOINT DETECTED ***")
+                        is_mimic = True
+
+                        # Get mimic properties
+                        for attr in prim.GetAttributes():
+                            attr_name = attr.GetName()
+                            if "mimic" in attr_name.lower():
+                                print(f"      {attr_name}: {attr.Get()}")
+                except Exception as e:
+                    # Check manually for mimic attributes
+                    for attr in prim.GetAttributes():
+                        attr_name = attr.GetName()
+                        if "mimic" in attr_name.lower():
+                            print(f"    *** MIMIC JOINT DETECTED (via attributes) ***")
+                            print(f"      {attr_name}: {attr.Get()}")
+                            is_mimic = True
+
+                # Get joint limits
+                lower_attr = prim.GetAttribute("physics:lowerLimit")
+                upper_attr = prim.GetAttribute("physics:upperLimit")
+
+                if lower_attr and upper_attr:
+                    lower = lower_attr.Get()
+                    upper = upper_attr.Get()
+                    print(f"    Limits: [{lower}, {upper}]")
+
+                # Check for drive/actuator
+                has_drive = False
+                for attr in prim.GetAttributes():
+                    if "drive" in attr.GetName().lower():
+                        has_drive = True
+                        break
+                print(f"    Has Drive: {has_drive}")
+
+                # Get connected bodies
+                body0_rel = prim.GetRelationship("physics:body0")
+                body1_rel = prim.GetRelationship("physics:body1")
+
+                if body0_rel and body1_rel:
+                    b0 = body0_rel.GetTargets()
+                    b1 = body1_rel.GetTargets()
+                    if b0:
+                        print(f"    Body0: {b0[0].pathString.split('/')[-1]}")
+                    if b1:
+                        print(f"    Body1: {b1[0].pathString.split('/')[-1]}")
+
+                joint_info[prim_name] = {
+                    "path": prim_path,
+                    "has_drive": has_drive,
+                    "is_mimic": is_mimic
+                }
+
+    # Analyze the results
+    print_sep("ANALYSIS")
+
+    print("\nJoint Control Summary:")
+    print("-" * 80)
+
+    mimic_joints = [name for name, info in joint_info.items() if info.get("is_mimic", False)]
+    driven_joints = [name for name, info in joint_info.items() if info.get("has_drive", False)]
+
+    print(f"\nTotal gripper joints found: {len(joint_info)}")
+    print(f"Mimic joints: {len(mimic_joints)}")
+    if mimic_joints:
+        for name in mimic_joints:
+            print(f"  - {name}")
+
+    print(f"\nJoints with drives: {len(driven_joints)}")
+    if driven_joints:
+        for name in driven_joints:
+            print(f"  - {name}")
+
+    # Test actual behavior
+    print_sep("BEHAVIORAL TEST")
+
+    print("\nTesting: What happens when we move finger_joint?")
+    print("-" * 80)
+
+    joint_names = robot.data.joint_names
+    finger_idx = joint_names.index("finger_joint")
+
+    # Get indices of all gripper joints
+    gripper_indices = {}
+    for name in gripper_joints:
+        if name in joint_names:
+            gripper_indices[name] = joint_names.index(name)
+
+    print(f"\nGripper joint indices:")
+    for name, idx in gripper_indices.items():
+        print(f"  {name:30s}: index {idx}")
+
+    # Record initial positions
+    initial_pos = robot.data.joint_pos[0].clone()
+
+    print(f"\nInitial positions:")
+    for name, idx in gripper_indices.items():
+        print(f"  {name:30s}: {initial_pos[idx].item():7.3f}")
+
+    # Command finger_joint to move to 0.5
+    targets = torch.zeros((1, robot.num_joints), device=sim.device)
+    targets[:] = robot.data.default_joint_pos
+    targets[:, finger_idx] = 0.5
+
+    print(f"\nCommanding finger_joint to 0.5...")
+    print(f"Simulating for 100 steps...")
+
+    for step in range(100):
+        robot.set_joint_position_target(targets)
+        robot.write_data_to_sim()
+        sim.step()
+        scene.update(dt=0.01)
+
+    # Check final positions
+    final_pos = robot.data.joint_pos[0]
+
+    print(f"\nFinal positions after commanding finger_joint=0.5:")
+    print("-" * 80)
+
+    for name, idx in gripper_indices.items():
+        initial = initial_pos[idx].item()
+        final = final_pos[idx].item()
+        delta = final - initial
+
+        marker = ""
+        if name == "finger_joint":
+            marker = " <-- COMMANDED"
+        elif abs(delta) > 0.01:
+            marker = " <-- MOVED! (likely mimic)"
+        else:
+            marker = " <-- No movement"
+
+        print(f"  {name:30s}: {initial:7.3f} → {final:7.3f} (Δ={delta:+7.3f}){marker}")
+
+    # Conclusions
+    print_sep("CONCLUSIONS")
+
+    moved_joints = []
+    for name, idx in gripper_indices.items():
+        if name != "finger_joint":
+            delta = abs(final_pos[idx].item() - initial_pos[idx].item())
+            if delta > 0.01:
+                moved_joints.append(name)
+
+    if moved_joints:
+        print(f"\n✓ The following joints moved when finger_joint was commanded:")
+        for name in moved_joints:
+            print(f"  - {name}")
+        print("\n  → These are likely MIMIC joints (automatically coupled to finger_joint)")
+        print("  → You do NOT need to actuate them separately")
+        print("  → Your current config is CORRECT")
+    else:
+        print(f"\n✗ No other joints moved when finger_joint was commanded!")
+        print("\n  → These joints are INDEPENDENT")
+        print("  → You NEED to add them to your actuator configuration")
+        print("  → This is why your gripper isn't working properly!")
+
+        print("\n  REQUIRED FIX:")
+        print("  Add all gripper joints to the actuator:")
+        print("""
+        "gripper": ImplicitActuatorCfg(
+            joint_names_expr=["finger_joint", "left_inner_knuckle_joint", 
+                            "right_inner_knuckle_joint", "right_outer_knuckle_joint",
+                            "left_outer_finger_joint", "right_outer_finger_joint"],
+            # ... same settings ...
+        ),
+        """)
+
+    print_sep("END")
 
     simulation_app.close()
 
 
 if __name__ == "__main__":
-    main()
+    inspect_gripper_joints()
