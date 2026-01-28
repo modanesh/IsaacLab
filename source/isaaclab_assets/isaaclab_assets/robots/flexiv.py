@@ -1,77 +1,60 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
-# All rights reserved.
-#
+# Copyright (c) 2022-2025, The Isaac Lab Project Developers
 # SPDX-License-Identifier: BSD-3-Clause
-
-"""Configuration for the Flexiv robots.
-
-The following configurations are available:
-
-* : obj:`FLEXIV_WITH_GRIPPER_CFG`: Flexiv Rizon 4 robot
-* :obj:`FLEXIV_RIZON4_HIGH_PD_CFG`: Flexiv Rizon 4 robot with stiffer PD control
-
-Reference:  https://github.com/flexivrobotics/isaac_sim_ws
-
-Joint Limits (in radians):
-    - joint1: [-2.792, 2.792]  (±160°)
-    - joint2: [-2.269, 2.269]  (±130°)
-    - joint3: [-2.967, 2.967]  (±170°)
-    - joint4: [-1.867, 2.688]  (-107° to 154°)
-    - joint5: [-2.967, 2.967]  (±170°)
-    - joint6: [-1.396, 4.538]  (-80° to 260°)
-    - joint7: [-2.967, 2.967]  (±170°)
-"""
 
 import isaaclab.sim as sim_utils
 from isaaclab.actuators import ImplicitActuatorCfg
 from isaaclab.assets.articulation import ArticulationCfg
-from isaaclab.utils.assets import ISAACLAB_NUCLEUS_DIR
 
-# Main configuration for Flexiv + Robotiq gripper
+# CRITICAL: Point to the new FIXED file you just generated
+USD_PATH = "/home/mohamad/Research/IsaacLab/source/isaaclab_assets/isaaclab_assets/robots/data/flexiv/Rizon4s_with_Grav_FIXED.usd"
+
 FLEXIV_WITH_GRIPPER_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path="/home/mohamad/Research/IsaacLab/source/isaaclab_assets/isaaclab_assets/robots/data/flexiv/flexiv_rizon4_with_Robotiq_2F_85_flattened.usd",
+        usd_path=USD_PATH,
         activate_contact_sensors=False,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=False,
             max_depenetration_velocity=5.0,
         ),
         articulation_props=sim_utils.ArticulationRootPropertiesCfg(
-            enabled_self_collisions=True, solver_position_iteration_count=8, solver_velocity_iteration_count=0
+            # Keep False for now. Once training works, you can try True if you need self-collision.
+            enabled_self_collisions=False,
+            solver_position_iteration_count=8,
+            solver_velocity_iteration_count=0
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
+        # Safe "Candle/Home" pose.
+        # (Franka's -2.81 on joint4 would crash this robot)
         joint_pos={
             "joint1": 0.0,
-            "joint2": -0.6,
+            "joint2": -0.5,
             "joint3": 0.0,
-            "joint4": -1.5,
+            "joint4": 1.5,
             "joint5": 0.0,
-            "joint6": 1.0,
+            "joint6": 0.5,
             "joint7": 0.0,
-            "finger_joint": 0.04,
+            # Gripper is Revolute: 0.0 is Open
+            "finger_joint": 0.0,
         },
     ),
     actuators={
         "flexiv_arm": ImplicitActuatorCfg(
             joint_names_expr=["joint[1-7]"],
-            effort_limit_sim=87.0,
-            stiffness=80.0,
-            damping=4.0,
+            effort_limit_sim=100.0,
+            velocity_limit_sim=2.0,
+            stiffness=400.0,   # Good stiffness for RL
+            damping=40.0,
         ),
         "gripper": ImplicitActuatorCfg(
+            # Control the driver joint. The patched USD removed the hostile internal drive.
             joint_names_expr=["finger_joint"],
-            effort_limit_sim=200.0,
-            stiffness=2e3,
-            damping=1e2,
+            effort_limit=40.0,
+            effort_limit_sim=40.0,
+            velocity_limit_sim=2.0,
+            stiffness=800.0,   # Stiff enough to hold the cube
+            damping=40.0,
         ),
     },
+    soft_joint_pos_limit_factor=1.0,
 )
-
-# Add a high-pd version of the configuration for stiffer control
-FLEXIV_HIGH_PD_CFG = FLEXIV_WITH_GRIPPER_CFG.copy()
-FLEXIV_HIGH_PD_CFG.spawn.rigid_props.disable_gravity = True
-FLEXIV_HIGH_PD_CFG.actuators["flexiv_arm"].stiffness = 400.0
-FLEXIV_HIGH_PD_CFG.actuators["flexiv_arm"].damping = 80.0
-FLEXIV_HIGH_PD_CFG.actuators["gripper"].stiffness = 4000.0  # High stiffness for the gripper
-FLEXIV_HIGH_PD_CFG.actuators["gripper"].damping = 200.0
